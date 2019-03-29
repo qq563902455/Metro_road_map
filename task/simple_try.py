@@ -33,7 +33,7 @@ param_dict = {
     'random_state': 2017,
     'num_leaves': 31,
     'max_depth': 5,
-    'min_child_samples': 50,
+    'min_child_samples': 100,
     'subsample': 0.8,
     'colsample_bytree': 0.8,
     'learning_rate': 0.15,
@@ -50,21 +50,24 @@ feature_importances_in = pd.Series(model_in.feature_importances_)
 feature_importances_in.index = train_x.columns.tolist()
 feature_importances_in = feature_importances_in.sort_values()
 
+
 param_dict = {
     'random_state': 2017,
     'num_leaves': 31,
     'max_depth': 5,
-    'min_child_samples': 50,
+    'min_child_samples': 100,
     'subsample': 0.8,
     'colsample_bytree': 0.8,
     'learning_rate': 0.1,
-    'n_estimators': 5000,
+    'n_estimators': 7000,
     'reg_sqrt': True,
     'objective': 'regression_l1',
 }
 
 model_out = lgb.LGBMRegressor(**param_dict)
-model_out.fit(train_x, train_y_out, eval_set=[(valid_x, valid_y_out)], early_stopping_rounds=200, verbose=100)
+model_out.fit(train_x, train_y_out,
+              eval_set=[(valid_x, valid_y_out)], early_stopping_rounds=200, verbose=100)
+
 
 feature_importances_out = pd.Series(model_out.feature_importances_)
 feature_importances_out.index = train_x.columns.tolist()

@@ -74,6 +74,9 @@ def feature_extract(train_x, train_y=None):
         out_df.loc[out_df['outNums_lastday_'+str(delay)].isna(), 'outNums_lastday_'+str(delay)] = out_df[out_df['outNums_lastday_'+str(delay)].isna()]['outNums_lastday']
         out_df.loc[out_df['inNums_lastday_'+str(delay)].isna(), 'inNums_lastday_'+ str(delay)] = out_df[out_df['inNums_lastday_'+ str(delay)].isna()]['inNums_lastday']
 
+        # out_df['outNums_lastday_'+str(delay)] = out_df['outNums_lastday_'+str(delay)] - out_df['outNums_lastday']
+        # out_df['inNums_lastday_'+str(delay)] = out_df['inNums_lastday_'+str(delay)] - out_df['inNums_lastday']
+
     neighbor_list = []
     for stationID in out_df.stationID.unique():
 

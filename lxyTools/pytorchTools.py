@@ -22,6 +22,64 @@ def set_random_seed(seed=2019):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
 
+
+# class GRU(nn.Module):
+#     def __init__(self, input_size, hidden_size):
+#         nn.Module.__init__(self)
+#
+#         self.hidden_size = hidden_size
+#
+#         self.linear_ir = nn.Linear(input_size, hidden_size)
+#         self.linear_hr = nn.Linear(hidden_size, hidden_size)
+#
+#         self.linear_iz = nn.Linear(input_size, hidden_size)
+#         self.linear_hz = nn.Linear(hidden_size, hidden_size)
+#
+#         self.linear_in = nn.Linear(input_size, hidden_size)
+#         self.linear_hn = nn.Linear(hidden_size, hidden_size)
+#
+#         self.linear_out = nn.Linear(hidden_size, hidden_size)
+#
+#         self.sigmoid = nn.Sigmoid()
+#         self.tanh = nn.Tanh()
+#
+#     def step(self, x, h):
+#
+#         r = self.sigmoid(self.linear_ir(x) + self.linear_hr(h))
+#         z = self.sigmoid(self.linear_iz(x) + self.linear_hz(h))
+#         n = self.tanh(self.linear_in(x) + torch.mul(r, self.linear_hn(h)))
+#
+#         h_new = torch.mul((1-z), n) + torch.mul(z, h)
+#
+#         y = self.linear_out(h_new)
+#         return y, h_new
+#
+#     def forward(self, x):
+#
+#         outlist = []
+#         h = torch.tensor(np.zeros((x.shape[0], self.hidden_size)), dtype=torch.float32).cuda()
+#         for i in range(x.shape[1]):
+#
+#             y,h = self.step(x[:, i, :], h)
+#             y = y.contiguous().view(-1, 1, self.hidden_size)
+#             outlist.append(y)
+#         return torch.cat(outlist, dim=1)
+#
+# class BiGRU(nn.Module):
+#     def __init__(self, input_size, hidden_size):
+#         nn.Module.__init__(self)
+#         self.gru1 = GRU(input_size, hidden_size)
+#         self.gru2 = GRU(input_size, hidden_size)
+#     def forward(self, x):
+#         x_flip = torch.flip(x, [1])
+#
+#         y1 = self.gru1(x)
+#         y2 = self.gru1(x_flip)
+#
+#         return torch.cat([y1, y2], 2)
+
+
+
 class Attention(nn.Module):
     def __init__(self, feature_dim, step_dim, bias=True, **kwargs):
         super(Attention, self).__init__(**kwargs)
@@ -88,6 +146,21 @@ class selfAttention(nn.Module):
         context = torch.matmul(attention, v)
 
         return context
+
+
+class multilayerSelfAttention(nn.Module):
+    def __init__(self, qk_dim, v_dim, input_dim, num_layers=1, dk=None):
+        nn.Module.__init__(self)
+        self.attentionlist = nn.ModuleList([selfAttention(qk_dim, v_dim, input_dim, dk) for i in range(num_layers)])
+
+    def forward(self, x):
+        out = x
+        for atten in self.attentionlist:
+            out = atten(out)
+        return out
+
+
+
 
 class multiHeadAttention(nn.Module):
     def __init__(self, qk_dim, v_dim, input_dim, h, dk=None):
