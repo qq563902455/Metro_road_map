@@ -58,11 +58,19 @@ def feature_extract(train_x, train_y=None):
             train_y_ex =  train_y_ex.rename({'num_x': 'outNums_lastday_'+str(payType), 'num_y': 'inNums_lastday_'+str(payType)}, axis=1)
 
 
-    train_y_ex['day'] = i+1
     train_y_ex = train_y_ex.fillna(0)
-
-
     return train_y_ex
+
+
+def multidays_feature_extract(day1, day2):
+    feature_names = []
+    for col in day1.columns:
+        if 'lastday' in col:
+            feature_names.append(col)
+
+    out = pd.merge(day1, day2[['stationID', 'time']+feature_names], on=['stationID', 'time'], how='left')
+    return out
+
 
 roadmap = pd.read_csv('./rawdata/Metro_roadMap.csv')
 
@@ -70,23 +78,46 @@ roadmap = pd.read_csv('./rawdata/Metro_roadMap.csv')
 train_list = []
 for i in range(1, 25):
 
-    x_day = str(i)
-    if len(x_day) == 1: x_day = '0' + x_day
+    x_day_1 = str(i)
+    if len(x_day_1) == 1: x_day_1 = '0' + x_day_1
+
+    x_day_2 = str(i-6)
+    if len(x_day_2) == 1: x_day_2 = '0' + x_day_2
+
     y_day = str(i+1)
     if len(y_day) == 1: y_day = '0' + y_day
 
-    train_x = pd.read_csv('./rawdata/Metro_train/record_2019-01-'+x_day+'.csv')
+    train_x_1 = pd.read_csv('./rawdata/Metro_train/record_2019-01-'+x_day_1+'.csv')
+    # train_x_2 = pd.read_csv('./rawdata/Metro_train/record_2019-01-'+x_day_2+'.csv')
+
     train_y = pd.read_csv('./rawdata/Metro_train/record_2019-01-'+y_day+'.csv')
 
-    train = feature_extract(train_x, train_y)
+    # train_1 = feature_extract(train_x_1, train_y)
+    # train_2 = feature_extract(train_x_2, train_y)
+    #
+    # train = multidays_feature_extract(train_1, train_2)
+
+    train = feature_extract(train_x_1, train_y)
+
+    train['day'] = i+1
 
     train_list.append(train)
     print(i)
 
 train = pd.concat(train_list)
 
-test_x = pd.read_csv('./rawdata/Metro_testA/testA_record_2019-01-28.csv')
-test = feature_extract(test_x)
+test_x_1 = pd.read_csv('./rawdata/Metro_testA/testA_record_2019-01-28.csv')
+# test_x_2 = pd.read_csv('./rawdata/Metro_train/record_2019-01-22.csv')
+
+# test_1 = feature_extract(test_x_1)
+# test_2 = feature_extract(test_x_2)
+
+# test = multidays_feature_extract(test_1, test_2)
+
+test = feature_extract(test_x_1)
+
+
+test['day'] = 29
 
 train.to_csv('./processedData/train.csv', index=False)
 test.to_csv('./processedData/test.csv', index=False)

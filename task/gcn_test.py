@@ -8,7 +8,7 @@ import time
 
 
 from lxyTools.pytorchTools import selfAttention
-
+from lxyTools.pytorchTools import GatedConv1d
 
 import torch
 from torch import nn
@@ -35,15 +35,16 @@ set_random_seed(2018)
 raw_train = pd.read_csv('./processedData/train.csv')
 test = pd.read_csv('./processedData/test.csv')
 
+
 roadmap = pd.read_csv('./rawdata/Metro_roadMap.csv')
-
-roadmap.loc[roadmap.index==55, '53'] = 1
-roadmap.loc[np.array(roadmap['53']==1)&np.array(roadmap.index==54), '53'] = 0
-
-roadmap.loc[roadmap.index==53, '55'] = 1
-roadmap.loc[np.array(roadmap['55']==1)&np.array(roadmap.index==54), '55'] = 0
-
-roadmap.loc[roadmap['54']==1, '54'] = 0
+#
+# roadmap.loc[roadmap.index==55, '53'] = 1
+# roadmap.loc[np.array(roadmap['53']==1)&np.array(roadmap.index==54), '53'] = 0
+#
+# roadmap.loc[roadmap.index==53, '55'] = 1
+# roadmap.loc[np.array(roadmap['55']==1)&np.array(roadmap.index==54), '55'] = 0
+#
+# roadmap.loc[roadmap['54']==1, '54'] = 0
 
 max_range = np.percentile(np.sqrt(raw_train.inNums), 90)
 
@@ -52,9 +53,7 @@ valid_set_days = [8, 15, 22]
 
 
 train = raw_train[raw_train.day.apply(lambda x: x in train_set_days)]
-
 valid = raw_train[raw_train.day.apply(lambda x: x in valid_set_days)]
-
 
 
 index_list1=[]
@@ -68,6 +67,16 @@ edge_index = torch.tensor([index_list1, index_list2], dtype=torch.long).cuda()
 
 node_feature_names = train.drop(['stationID', 'time', 'day', 'inNums', 'outNums'], axis=1).columns.tolist()
 
+# out_features_index = []
+# in_features_index = []
+# for i in range(len(node_feature_names)):
+#     if 'out' in  node_feature_names[i]:
+#         out_features_index.append(i)
+#     if 'in' in node_feature_names[i]:
+#         in_features_index.append(i)
+
+
+
 
 class mydataset(Dataset):
     def __init__(self, graph_list):
@@ -77,6 +86,51 @@ class mydataset(Dataset):
         return len(self.graph_list)
     def get(self, idx):
         return self.graph_list[idx]
+
+
+
+# def Df_to_Graph(raw_data, train_set_days, valid_set_days, test_set_days):
+#     train_graph_list = []
+#     valid_graph_list = []
+#     test_graph_list = []
+#     for day in (train_set_days+valid_set_days+test_set_days):
+#         train_day = raw_data[np.array(raw_data.day==day)|np.array(raw_data.day==day-7)]
+#         print(day)
+#         print(train_day.shape)
+#         print(train_day.head())
+#         train_day = train_day.sort_values(by=['stationID', 'time', 'day'])
+#
+#         data_content = train_day[node_feature_names].values.reshape(-1, 144*2*len(node_feature_names))
+#         data_content = np.sqrt(data_content)/max_range
+#         data_content = torch.tensor(data_content, dtype=torch.float).cuda()
+#
+#
+#         label = train_day[train_day.day==day][['outNums', 'inNums']].values.reshape(-1, 144*2)
+#         label = np.sqrt(label)/max_range
+#         label = torch.tensor(label, dtype=torch.float).cuda()
+#
+#
+#         if data_content.shape[0] != 81:
+#             print('err')
+#             while True: pass
+#
+#         single_graph = Data(x=data_content, y=label, edge_index=edge_index)
+#
+#         if day in train_set_days:
+#             train_graph_list.append(single_graph)
+#         if day in valid_set_days:
+#             valid_graph_list.append(single_graph)
+#         if day in test_set_days:
+#             test_graph_list.append(single_graph)
+#
+#     return mydataset(train_graph_list), mydataset(valid_graph_list), mydataset(test_graph_list)
+#
+# dataset_train, dataset_valid, dataset_test = Df_to_Graph(pd.concat([raw_train, test[raw_train.columns]], axis=0), train_set_days, valid_set_days, [29])
+
+
+# train_loader = DataLoader(dataset_train, batch_size=1, shuffle=True)
+# valid_loader = DataLoader(dataset_valid, batch_size=1, shuffle=False)
+# test_loader = DataLoader(dataset_test, batch_size=1, shuffle=False)
 
 
 
@@ -109,6 +163,8 @@ def Df_to_Graph(data_df):
 train_loader = DataLoader(Df_to_Graph(train), batch_size=1, shuffle=True)
 valid_loader = DataLoader(Df_to_Graph(valid), batch_size=1, shuffle=False)
 test_loader = DataLoader(Df_to_Graph(test), batch_size=1, shuffle=False)
+
+
 
 
 
@@ -172,9 +228,6 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
 
         self.dropout = nn.Dropout(0.10)
-
-
-
         # self.st_conv = STChebConv(8, 8, 8, 3, K=5).cuda()
 
         self.multi_conv1d1 = MultiScaleConv(8, 2).cuda()
@@ -190,11 +243,12 @@ class Net(torch.nn.Module):
         self.conv2 = ChebConv(144*8, 144*2, K=5).cuda()
 
         # self.conv3 = GATConv(144*8, 144*1, heads=2).cuda()
-        # self.linear = nn.Linear(144*16, 144*8).cuda()
+
         # self.conv2 = GatedGraphConv(144*8, num_layers=3).cuda()
 
         # self.multi_conv1d2 = MultiScaleConv(8, 2)
 
+        self.linear = nn.Linear(144*2, 144*2).cuda()
 
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
@@ -202,12 +256,15 @@ class Net(torch.nn.Module):
 
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
+
+
         x = self.dropout(x)
 
         # x_conv1 = self.st_conv(x, edge_index)
 
         multi_conv1d_1_cat, multi_conv1d_1  = self.multi_conv1d1(x)
-        multi_conv1d_1 = self.relu(multi_conv1d_1)
+        # multi_conv1d_1_cat = self.relu(multi_conv1d_1_cat)
+        # multi_conv1d_1 = self.relu(multi_conv1d_1)
 
         x_conv1 = self.conv1(multi_conv1d_1_cat, edge_index)
         x_conv1 = self.relu(x_conv1)
@@ -231,9 +288,6 @@ model = Net()
 
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=5e-4)
-# scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch_num: 1/np.sqrt(epoch_num+1))
-
-# scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lambda epoch_num: 1/np.sqrt(epoch_num/20+1))
 scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1000,1500,2000], gamma=0.2)
 
 loss_fn = nn.L1Loss()

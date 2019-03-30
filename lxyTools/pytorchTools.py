@@ -23,6 +23,37 @@ def set_random_seed(seed=2019):
     torch.backends.cudnn.deterministic = True
 
 
+class GatedConv1d(nn.Module):
+    def __init__(self, **kwargs):
+        nn.Module.__init__(self)
+        self.conv1d = nn.Conv1d(**kwargs)
+        self.sigmoid = nn.Sigmoid()
+
+        assert kwargs['out_channels']%2==0
+        self.out_channels = int(kwargs['out_channels']/2)
+
+        self.linear = nn.Linear(self.out_channels, 1)
+
+
+    def forward(self, x):
+
+        conv1d_out = self.conv1d(x)
+        P = conv1d_out[:, :self.out_channels, :]
+        Q = conv1d_out[:, self.out_channels:, :]
+
+        Q = self.linear(Q.contiguous().transpose(1, 2)).contiguous().transpose(1, 2).contiguous()
+
+        Q = self.sigmoid(Q)
+
+        out = P*Q
+
+        return out
+
+
+
+
+
+
 # class GRU(nn.Module):
 #     def __init__(self, input_size, hidden_size):
 #         nn.Module.__init__(self)
