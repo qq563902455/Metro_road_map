@@ -237,13 +237,11 @@ class Net(torch.nn.Module):
 
         self.multi_conv1d1 = MultiScaleConv(8, 2).cuda()
 
-        # self.lstm = nn.LSTM(8, 4, 2, batch_first=True, bidirectional=True).cuda()
-
-        # self.conv1 = MultiScaleChebConv(16, 2).cuda()
-        self.conv1 = ChebConv(144*8, 144*8, K=6).cuda()
+        self.conv1 = MultiScaleChebConv(16, 2).cuda()
+        # self.conv1 = ChebConv(144*16, 144*8, K=6).cuda()
         self.conv2 = ChebConv(144*8, 144*2, K=5).cuda()
 
-        self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
+        # self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
 
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
@@ -255,20 +253,15 @@ class Net(torch.nn.Module):
 
         x = self.dropout1(x)
 
-        # x = x.contiguous().view(-1, 144, 8)
-        # lstm_out,_ = self.lstm(x)
-        # lstm_out = torch.cat([lstm_out, x], 2)
-        # lstm_out = lstm_out.contiguous().view(-1, 144*16)
-
-        # multi_conv1d_1_cat, multi_conv1d_1  = self.multi_conv1d1(x)
+        multi_conv1d_1_cat, multi_conv1d_1  = self.multi_conv1d1(x)
         # multi_conv1d_1_cat = self.relu(multi_conv1d_1_cat)
         # multi_conv1d_1 = self.relu(multi_conv1d_1)
 
-        x_conv1 = self.conv1(x, edge_index)
+        x_conv1 = self.conv1(multi_conv1d_1_cat, edge_index)
         x_conv1 = self.relu(x_conv1)
 
-
         x_conv1 = self.dropout2(x_conv1)
+
 
         x_conv2 = self.conv2(x_conv1, edge_index)
         x_conv2 = self.relu(x_conv2)
@@ -305,16 +298,16 @@ for epoch in range(epoch_nums):
 
         avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(train_loader)
 
-    # for batch in valid_loader:
-    #     pred = model(batch)
-    #
-    #     loss = loss_fn(pred**2, batch.y**2)
-    #
-    #     optimizer.zero_grad()
-    #     loss.backward()
-    #     optimizer.step()
-    #
-    #     avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(valid_loader)
+    for batch in valid_loader:
+        pred = model(batch)
+
+        loss = loss_fn(pred**2, batch.y**2)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(valid_loader)
 
     model.eval()
     avg_val_loss = 0

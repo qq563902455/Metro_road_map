@@ -50,10 +50,10 @@ max_range = np.percentile(np.sqrt(raw_train.inNums), 90)
 
 
 # train_set_days = [4, 5, 6, 11, 12, 13, 18, 19]
-# train_set_days = [5, 6, 12, 13, 19, 26]
+train_set_days = [5, 6, 12, 13, 19, 26]
 # train_set_days = [4, 6, 11, 13, 18, 25]
-train_set_days = [4, 5, 6, 11, 12, 18, 19, 25, 26]
-valid_set_days = [13, 20]
+# train_set_days = [4, 5, 11, 12, 13, 18, 19, 25, 26]
+valid_set_days = [20]
 
 
 train = raw_train[raw_train.day.apply(lambda x: x in train_set_days)]
@@ -210,10 +210,10 @@ class MultiScaleChebConv(torch.nn.Module):
         self.out_channels = out_channels
         self.in_channels = in_channels
 
-        self.chebconv_k3 = ChebConv(in_channels, out_channels, K=4).cuda()
-        self.chebconv_k5 = ChebConv(in_channels, out_channels, K=5).cuda()
-        self.chebconv_k7 = ChebConv(in_channels, out_channels, K=6).cuda()
-        self.chebconv_k9 = ChebConv(in_channels, out_channels, K=7).cuda()
+        self.chebconv_k3 = ChebConv(in_channels, out_channels, K=3).cuda()
+        self.chebconv_k5 = ChebConv(in_channels, out_channels, K=4).cuda()
+        self.chebconv_k7 = ChebConv(in_channels, out_channels, K=5).cuda()
+        self.chebconv_k9 = ChebConv(in_channels, out_channels, K=6).cuda()
 
     def forward(self, x, edge_index):
 
@@ -232,18 +232,22 @@ class Net(torch.nn.Module):
         super(Net, self).__init__()
 
         self.dropout1 = nn.Dropout(0.1)
-        self.dropout2 = nn.Dropout(0.1)
+        self.dropout2 = nn.Dropout(0.2)
+
         # self.st_conv = STChebConv(8, 8, 8, 3, K=5).cuda()
 
-        self.multi_conv1d1 = MultiScaleConv(8, 2).cuda()
+        # self.multi_conv1d1 = MultiScaleConv(8, 2).cuda()
 
-        # self.lstm = nn.LSTM(8, 4, 2, batch_first=True, bidirectional=True).cuda()
+        self.conv1 = MultiScaleChebConv(8, 2).cuda()
+        # self.conv1 = ChebConv(144*8, 144*8, K=6).cuda()
 
-        # self.conv1 = MultiScaleChebConv(16, 2).cuda()
-        self.conv1 = ChebConv(144*8, 144*8, K=6).cuda()
+
+
         self.conv2 = ChebConv(144*8, 144*2, K=5).cuda()
 
-        self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
+        # self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
+
+
 
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
@@ -252,13 +256,7 @@ class Net(torch.nn.Module):
     def forward(self, data):
         x, edge_index = data.x, data.edge_index
 
-
         x = self.dropout1(x)
-
-        # x = x.contiguous().view(-1, 144, 8)
-        # lstm_out,_ = self.lstm(x)
-        # lstm_out = torch.cat([lstm_out, x], 2)
-        # lstm_out = lstm_out.contiguous().view(-1, 144*16)
 
         # multi_conv1d_1_cat, multi_conv1d_1  = self.multi_conv1d1(x)
         # multi_conv1d_1_cat = self.relu(multi_conv1d_1_cat)
@@ -268,7 +266,9 @@ class Net(torch.nn.Module):
         x_conv1 = self.relu(x_conv1)
 
 
+
         x_conv1 = self.dropout2(x_conv1)
+
 
         x_conv2 = self.conv2(x_conv1, edge_index)
         x_conv2 = self.relu(x_conv2)
@@ -281,11 +281,11 @@ model = Net()
 
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1500,2000,2300], gamma=0.1)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1000,1500,2000], gamma=0.1)
 
 loss_fn = nn.L1Loss()
 
-epoch_nums = 2500
+epoch_nums = 2200
 
 for epoch in range(epoch_nums):
     start_time = time.time()

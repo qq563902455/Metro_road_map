@@ -50,10 +50,10 @@ max_range = np.percentile(np.sqrt(raw_train.inNums), 90)
 
 
 # train_set_days = [4, 5, 6, 11, 12, 13, 18, 19]
-# train_set_days = [5, 6, 12, 13, 19, 26]
+train_set_days = [5, 6, 12, 13, 19, 26]
 # train_set_days = [4, 6, 11, 13, 18, 25]
-train_set_days = [4, 5, 6, 11, 12, 18, 19, 25, 26]
-valid_set_days = [13, 20]
+# train_set_days = [4, 5, 11, 12, 13, 18, 19, 25, 26]
+valid_set_days = [20]
 
 
 train = raw_train[raw_train.day.apply(lambda x: x in train_set_days)]
@@ -237,13 +237,13 @@ class Net(torch.nn.Module):
 
         self.multi_conv1d1 = MultiScaleConv(8, 2).cuda()
 
-        # self.lstm = nn.LSTM(8, 4, 2, batch_first=True, bidirectional=True).cuda()
-
         # self.conv1 = MultiScaleChebConv(16, 2).cuda()
-        self.conv1 = ChebConv(144*8, 144*8, K=6).cuda()
-        self.conv2 = ChebConv(144*8, 144*2, K=5).cuda()
+        self.conv1 = ChebConv(144*8, 144*4, K=6).cuda()
+        self.conv2 = ChebConv(144*4, 144*2, K=5).cuda()
 
-        self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
+        # self.multi_conv1d2 = MultiScaleConv(8, 2).cuda()
+
+
 
         self.selu = nn.SELU()
         self.relu = nn.ReLU()
@@ -255,11 +255,6 @@ class Net(torch.nn.Module):
 
         x = self.dropout1(x)
 
-        # x = x.contiguous().view(-1, 144, 8)
-        # lstm_out,_ = self.lstm(x)
-        # lstm_out = torch.cat([lstm_out, x], 2)
-        # lstm_out = lstm_out.contiguous().view(-1, 144*16)
-
         # multi_conv1d_1_cat, multi_conv1d_1  = self.multi_conv1d1(x)
         # multi_conv1d_1_cat = self.relu(multi_conv1d_1_cat)
         # multi_conv1d_1 = self.relu(multi_conv1d_1)
@@ -267,8 +262,8 @@ class Net(torch.nn.Module):
         x_conv1 = self.conv1(x, edge_index)
         x_conv1 = self.relu(x_conv1)
 
-
         x_conv1 = self.dropout2(x_conv1)
+
 
         x_conv2 = self.conv2(x_conv1, edge_index)
         x_conv2 = self.relu(x_conv2)
@@ -281,11 +276,11 @@ model = Net()
 
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001, weight_decay=5e-4)
-scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1500,2000,2300], gamma=0.1)
+scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[1000,1500,2000], gamma=0.1)
 
 loss_fn = nn.L1Loss()
 
-epoch_nums = 2500
+epoch_nums = 2200
 
 for epoch in range(epoch_nums):
     start_time = time.time()
@@ -305,16 +300,16 @@ for epoch in range(epoch_nums):
 
         avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(train_loader)
 
-    # for batch in valid_loader:
-    #     pred = model(batch)
-    #
-    #     loss = loss_fn(pred**2, batch.y**2)
-    #
-    #     optimizer.zero_grad()
-    #     loss.backward()
-    #     optimizer.step()
-    #
-    #     avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(valid_loader)
+    for batch in valid_loader:
+        pred = model(batch)
+
+        loss = loss_fn(pred**2, batch.y**2)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        avg_loss += loss.item()*(max_range**2)*batch.num_graphs / len(valid_loader)
 
     model.eval()
     avg_val_loss = 0
